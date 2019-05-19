@@ -1,10 +1,11 @@
-package edu.uci.ics.cs221.index.inverted;
+package edu.uci.ics.cs221.index.positional;
 
 import com.google.common.collect.Table;
 import com.sun.tools.javac.util.Name;
 import edu.uci.ics.cs221.analysis.ComposableAnalyzer;
 import edu.uci.ics.cs221.analysis.PorterStemmer;
 import edu.uci.ics.cs221.analysis.PunctuationTokenizer;
+import edu.uci.ics.cs221.index.inverted.*;
 import edu.uci.ics.cs221.storage.Document;
 import org.junit.After;
 import org.junit.Assert;
@@ -25,8 +26,8 @@ public class Team9PositionalStressTest {
     private String indexFolder  = "./index/Team9PositionalStressTest/";;
     private InvertedIndexManager invertedIndex;
     private Compressor compressor;
-    private static final int TOTALNUM = 50000;
-    private static final String textUrl = "https://github.com/DanniUCI/spring19-cs221-project/blob/master/team9StressTest.txt";
+    private static final int TOTALNUM = 100000;
+    private static String textUrl = "https://raw.githubusercontent.com/DanniUCI/Master-Courses/master/Team9PositionStressTest.txt";
 
     @Test(timeout = 600000)
     public void setupAndRun(){
@@ -61,21 +62,28 @@ public class Team9PositionalStressTest {
             e.printStackTrace();
         }
 
+        try {
+            test4();
+        } catch (Throwable e) {
+            System.out.println("Team9StressTest test4 FAILED");
+            e.printStackTrace();
+        }
+
     }
 
     // document contains 1530 times "h"
     // In this test, we will test the correctness of the size of document size and position list size
     public void test1(){
-        PageFileChannel.resetCounters();
         PositionalIndexSegmentForTest segment = invertedIndex.getIndexSegmentPositional(0);
-        Map<Integer, Document> docs = segment.getDocuments();
         Table<String, Integer, List<Integer>> positions = segment.getPositions();
+        int count = 0;
+        for(int i = 0; i < invertedIndex.getNumSegments(); ++i){
+            count += invertedIndex.getIndexSegmentPositional(i).getDocuments().size();
+        }
+        assertEquals(TOTALNUM, count);
         List<Integer> posList = positions.get("h", 0);
-
-        Assert.assertEquals(invertedIndex.getNumSegments(), InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD/2);
-        Assert.assertEquals(posList.size(), 1530);
-
-        assertTrue(PageFileChannel.readCounter<=3);
+        Assert.assertEquals(posList.size(), 300);
+        Assert.assertEquals(invertedIndex.getNumSegments(), InvertedIndexManager.DEFAULT_MERGE_THRESHOLD/2);
     }
 
 
@@ -92,15 +100,29 @@ public class Team9PositionalStressTest {
             count++;
         }
         assertTrue(PageFileChannel.readCounter > TOTALNUM);
-        assertEquals(count, TOTALNUM);
+        assertEquals(count, TOTALNUM/200 * 99);
 
     }
 
 
     //Test searchPhraseQuery with phrase "cat dog", result should be empty.
     public void test3(){
-        Iterator<Document> result1 = invertedIndex.searchPhraseQuery(Arrays.asList("cat","dog"));
-        assertTrue(!result1.hasNext());
+        Iterator<Document> result = invertedIndex.searchPhraseQuery(Arrays.asList("cat","dog"));
+        assertTrue(!result.hasNext());
+    }
+
+    // Test searchAndQuery and searchPhraseQuery with same phrase "domesticated", "family",
+    // result of searchAndQuery should be non-empty, result of searchPhraseQuery should be empty.
+    public void test4(){
+        Iterator<Document> result1 = invertedIndex.searchAndQuery(Arrays.asList("domesticated", "family"));
+        Iterator<Document> result2 = invertedIndex.searchPhraseQuery(Arrays.asList("domesticated", "family"));
+        int count = 0;
+        while(result1.hasNext()){
+            result1.next();
+            count++;
+        }
+        assertEquals(count, TOTALNUM/200 * 99);
+        assertTrue(!result2.hasNext());
     }
 
 
